@@ -3,8 +3,16 @@ Reverse tcp proxy
 
 ## how to use
  
-edit text some in line `12` and `46`
+windows edit text some in line `11` and `69`
 
-then `python main.py`
+linux edit text some in line `11` and `65`
+
+then if on linux
+
+`python linux.py`
+
+if on windows
+
+`python win.py`
 
 done :>
