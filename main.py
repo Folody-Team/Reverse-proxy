@@ -1,45 +1,68 @@
 import socketserver
 import socket
+import traceback
 from threading import Thread
 
 
-class MyTCPSocketHandler(socketserver.ThreadingMixIn,   socketserver.StreamRequestHandler):
-    daemon_threads = True
-    block_on_close = False
+class MyTCPSocketHandler(socketserver.ThreadingMixIn, socketserver.StreamRequestHandler):
 
     def handle(self):
         # server connect to client
-        endpoints = ("localhost", 8080)
+        endpoints = ("192.168.1.14", 80)
         print("Got connection from", self.client_address[0])
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(endpoints)
                 s.sendall(self.request.recv(1024))
-                s1 = Thread(target=get_send_revest, args=(self.request, s))
-                s2 = Thread(target=get_send_revest, args=(s, self.request))
-                s1.start()
-                s2.start()
-                s1.join()
-                s2.join()
+                s.setblocking(0)
+                self.request.setblocking(0)
+                d = Thread(target=recv_data_send ,args=(s,self.request))
+                d1 = Thread(target=recv_data_send ,args=(self.request, s))
+                d.start()
+                d1.start()
+                isclose = False
+                while not isclose:
+                    data = check_alive(s)
+                    if data:
+                        isclose = True
+                    data2 = check_alive(self.request)
+                    if data2:
+                        isclose = True
+                d.join(timeout=0)
+                d1.join(timeout=0)
                 s.close()
             self.request.close()
         except Exception as e:
-            print(e)
+            traceback.print_exc()
             self.request.close()
             return
 
+def check_alive(s):
+    try:
+        data = s.recv(1024, socket.MSG_PEEK)
+        isclose = False
+    except BlockingIOError:
+        isclose = False
+    except Exception as e:
+        isclose = True
+    return isclose
 
 # get data from client and send to server and reveive from server and send to client
-def get_send_revest(req, sock):
+def recv_data_send(req, sock):
     try:
         while True:
-            data = req.recv(1024)
-            if len(data) != 0:
-                sock.send(data)
-            else:
+            try:
+                data = req.recv(1024)
+                if len(data) != 0:
+                    sock.send(data)
+                else:
+                    break
+            except BlockingIOError:
+                pass
+            except:
                 break
     except:
-        pass
+        return
 
 if __name__ == "__main__":
     # Create the server at port 80
