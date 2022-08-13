@@ -70,4 +70,11 @@ if __name__ == "__main__":
     server = socketserver.ThreadingTCPServer(("0.0.0.0", PORT), MyTCPSocketHandler)
 
     print("Serving at {}".format(PORT))
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nKeyboardInterrupt")
+        server.shutdown()
+        server.server_close()
+        print("Server closed")
+        exit(0)
