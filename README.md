@@ -16,3 +16,5 @@ if on windows
 `python win.py`
 
 done :>
+
+code by The DT at Folody Studio
