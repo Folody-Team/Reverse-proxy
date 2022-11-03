@@ -1,28 +1,62 @@
+import os
 import socketserver
 import socket
 import traceback
+import time
 from multiprocessing.pool import ThreadPool as Pool
 
+timeout_sec = 60
 
 class MyTCPSocketHandler(socketserver.ThreadingMixIn, socketserver.StreamRequestHandler):
+    _timeout = None
+
+    def check_timeout(self):
+        if self._timeout is None:
+            return False
+        else:
+            return (time.monotonic() >= self._timeout)
+
+    def recv_data_send(self, req, sock):
+        try:
+            while True:
+                if check_alive(req) or check_alive(sock):
+                    return
+                try:
+                    data = req.recv(1024)
+                    if len(data) != 0:
+                        sock.send(data)
+                        if timeout_sec:
+                            self._timeout = time.monotonic() + timeout_sec
+                    else:
+                        break
+                except BlockingIOError:
+                    pass
+                except:
+                    break
+        except:
+            return
 
     def handle(self):
+        self.requestid = os.urandom(16).hex()
         # server connect to client
         endpoints = ("192.168.1.14", 3333)
-        print("Got connection from", self.client_address[0])
+        print("Got Request ID: %s" % self.requestid)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(endpoints)
                 s.sendall(self.request.recv(1024))
+                if timeout_sec:
+                    self._timeout = time.monotonic() + timeout_sec
                 s.setblocking(0)
                 self.request.setblocking(0)
                 pool = Pool()
-                rev = pool.apply_async(recv_data_send, args=(s, self.request))
-                sen = pool.apply_async(recv_data_send, args=(self.request, s))
-                while not (rev.ready() or sen.ready()):
+                rev = pool.apply_async(self.recv_data_send, args=(s, self.request))
+                sen = pool.apply_async(self.recv_data_send, args=(self.request, s))
+                while not (rev.ready() or sen.ready() or self.check_timeout()):
                     pass
-                pool.close()
+                pool.terminate()
                 s.close()
+                print("Request %s Closed" % self.requestid)
             self.request.close()
         except Exception as e:
             traceback.print_exc()
@@ -40,23 +74,6 @@ def check_alive(s):
     return isclose
 
 # get data from client and send to server and reveive from server and send to client
-def recv_data_send(req, sock):
-    try:
-        while True:
-            if check_alive(req) or check_alive(sock):
-                return
-            try:
-                data = req.recv(1024)
-                if len(data) != 0:
-                    sock.send(data)
-                else:
-                    break
-            except BlockingIOError:
-                pass
-            except:
-                break
-    except:
-        return
 
 if __name__ == "__main__":
     # Create the server at port 80
