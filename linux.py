@@ -1,33 +1,24 @@
 import socketserver
 import socket
 import traceback
-from threading import Thread
-
+from multiprocessing.pool import ThreadPool as Pool
 
 class MyTCPSocketHandler(socketserver.ThreadingMixIn, socketserver.StreamRequestHandler):
 
     def handle(self):
         # server connect to client
-        endpoints = ("192.168.1.14", 8080)
+        endpoints = ("192.168.1.14", 3333)
         print("Got connection from", self.client_address[0])
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(endpoints)
                 s.sendall(self.request.recv(1024))
-                d = Thread(target=recv_data_send ,args=(s,self.request))
-                d1 = Thread(target=recv_data_send ,args=(self.request, s))
-                d.start()
-                d1.start()
-                isclose = False
-                while not isclose:
-                    data = check_alive(s)
-                    if data:
-                        isclose = True
-                    data2 = check_alive(self.request)
-                    if data2:
-                        isclose = True
-                d.join(timeout=0)
-                d1.join(timeout=0)
+                pool = Pool()
+                rev = pool.apply_async(recv_data_send ,args=(s,self.request))
+                sen = pool.apply_async(recv_data_send, args=(self.request, s))
+                while not (rev.ready() or sen.ready()):
+                    pass
+                pool.close()
                 s.close()
             self.request.close()
         except Exception as e:
@@ -49,6 +40,8 @@ def check_alive(s):
 def recv_data_send(req, sock):
     try:
         while True:
+            if check_alive(req) or check_alive(sock):
+                return
             try:
                 data = req.recv(1024)
                 if len(data) != 0:
