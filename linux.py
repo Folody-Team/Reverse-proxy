@@ -43,6 +43,8 @@ class MyTCPSocketHandler(socketserver.ThreadingMixIn, socketserver.StreamRequest
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(endpoints)
                 s.sendall(self.request.recv(1024))
+                if timeout_sec:
+                    self._timeout = time.monotonic() + timeout_sec
                 pool = Pool()
                 rev = pool.apply_async(self.recv_data_send ,args=(s,self.request))
                 sen = pool.apply_async(self.recv_data_send, args=(self.request, s))
